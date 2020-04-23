@@ -6,8 +6,8 @@ on:
   push:
     branches:
       - master
-      - "feature/*"
-      - "fixes/*"
+      - "feature/**"
+      - "fixes/**"
 
 jobs:
   build:
