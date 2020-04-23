@@ -46,7 +46,9 @@ library
   import:              common-options
   hs-source-dirs:      src
   exposed-modules:     Havenza
-  build-depends:        servant
+  build-depends:        blaze-markup
+                      , blaze-html
+                      , servant
                       , servant-blaze
                       , servant-js
                       , servant-multipart
