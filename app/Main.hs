@@ -1,7 +1,9 @@
 module Main (main) where
 
-import Havenza (someFunc)
+import Havenza
 
+import Servant.Server
+import Network.Wai.Handler.Warp (run)
 
 main :: IO ()
-main = someFunc
+main = run 8080 (serve webApi avenzaHandlers)

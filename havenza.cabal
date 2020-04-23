@@ -47,12 +47,19 @@ library
   import:              common-options
   hs-source-dirs:      src
   exposed-modules:     Havenza
+  build-depends:        servant
+                      , servant-blaze
+                      , servant-server
+                      , servant-js
+                      , servant-multipart
+                      , text
 
 executable havenza
   import:              common-options
   hs-source-dirs:      app
   main-is:             Main.hs
-  build-depends:       havenza
+  build-depends:        havenza
+                      , warp
   ghc-options:         -threaded
                        -rtsopts
                        -with-rtsopts=-N
