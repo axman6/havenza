@@ -23,6 +23,7 @@ source-repository head
 
 common common-options
   build-depends:       base >= 4.10.1.0 && < 4.14
+                      , servant-server
   
   ghc-options:         -Wall
                        -Wcompat
@@ -47,7 +48,6 @@ library
   exposed-modules:     Havenza
   build-depends:        servant
                       , servant-blaze
-                      , servant-server
                       , servant-js
                       , servant-multipart
                       , text
