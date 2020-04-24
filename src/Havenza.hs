@@ -74,7 +74,7 @@ type MapFile
 newtype IndexPage = IndexPage [ProjectName]
 newtype ProjectName = ProjectName { unProjectName :: Text }
   deriving stock (Show, Eq)
-  deriving newtype (FromHttpApiData, ToHttpApiData)
+  deriving newtype (Ord, FromHttpApiData, ToHttpApiData)
 
 data ProjectPage = ProjectPage ProjectName [MapFileName] 
   deriving stock (Show, Eq)
@@ -191,22 +191,46 @@ instance ToMarkup IndexPage where
             a ! href (toValue $ toUrlPiece lnk) $ toMarkup projectText
 
 instance ToMarkup ProjectPage where
-  toMarkup (ProjectPage project fileNames) = do
-    p "Files:"
-    ul $ mapM_ linkFile fileNames
-    H.form ! action "#" ! method "post" ! enctype "multipart/form-data" $ do
-        p "Upload file:"
-        input ! type_ "file" ! name "file"
-        br
-        input ! type_ "submit" ! name "submit"
+  toMarkup (ProjectPage project fileNames) =
+    H.div ! class_ "container" $
+      H.div ! class_ "row" $ do
+        H.div ! class_ "col-md-7 col-sm-12" $ do
+          h1 $ do
+            text (unProjectName project)
+            small $ linkForAvenzamap project
+          p "Files:"
+          ul $ mapM_ linkFile fileNames
+        H.div ! class_ "col-md-5 col-sm-12" $
+          H.div ! class_ "card" $
+            H.div ! class_ "section" $
+              H.form ! action "#" ! method "post" ! enctype "multipart/form-data" $
+                fieldset $ do
+                  H.legend ! class_ "doc" $ "Upload file:"
+                  input ! type_ "file" ! name "file"
+                  br
+                  input ! class_ "button-primary tertiary small" ! type_ "submit" ! name "submit"
     where
       linkFile :: MapFileName -> Markup
       linkFile mapFile@(MapFileName mapFileText) =
         let lnk = safeLink webApi (Proxy @MapFile) project mapFile
-        in a ! href ("/" <> toValue (toUrlPiece lnk)) $ toMarkup mapFileText
+        in li $ a ! href ("/" <> toValue (toUrlPiece lnk)) $ toMarkup mapFileText
+      
+      linkForAvenzamap :: ProjectName -> Markup
+      linkForAvenzamap projectName =
+        let lnk = safeLink webApi (Proxy @ProjectAvenzamap) projectName
+        in a ! href ("/" <> toValue (toUrlPiece lnk)) $ "MapCollection.avenzamaps"
 
 instance ToMarkup a => ToMarkup (HTMLTemplate a) where
   toMarkup (HTMLTemplate wrapped) =
-    H.html $ 
-      H.body $ 
-        toMarkup wrapped
+    docTypeHtml $ 
+      H.html ! lang "en" $ do
+        H.head $ do
+          meta ! charset "utf-8"
+          meta ! name "viewport" ! content "width=device-width, initial-scale=1"
+          link ! rel "stylesheet" ! href "https://cdn.rawgit.com/Chalarangelo/mini.css/v3.0.1/dist/mini-default.min.css"
+          -- link ! rel "stylesheet" ! href "//fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic"
+          -- link ! rel "stylesheet" ! href "//cdnjs.cloudflare.com/ajax/libs/normalize/5.0.0/normalize.css"
+          -- link ! rel "stylesheet" ! href "//cdnjs.cloudflare.com/ajax/libs/milligram/1.3.0/milligram.css"
+        H.body $ 
+          H.main ! class_ "wrapper" $
+            toMarkup wrapped
