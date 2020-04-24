@@ -118,7 +118,7 @@ newtype App a = App { _runApp :: ReaderT (IORef AppState) Handler a }
 runApp :: IORef AppState -> App a -> Handler a
 runApp ref = flip runReaderT ref . _runApp
 
-data AppState = AppState
+newtype AppState = AppState
   {_asProjectMap :: Map ProjectName (Map MapFileName UploadedFile)
   } deriving stock (Show, Eq)
 
