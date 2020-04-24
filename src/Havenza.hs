@@ -17,14 +17,25 @@ A server for generating .avenzamaps documents from uploaded PDFs
 module Havenza
        ( API
        , WebAPI
+       , runApp
+       , emptyAppState
        , api
        , webApi
-       , avenzaAPIJS
        , avenzaHandlers
        ) where
 
+import Control.Monad.IO.Class (MonadIO(..))
+import Control.Monad.Reader (MonadReader(..), ReaderT(..))
+import Control.Monad.Error.Class (MonadError(..))
+
+import Data.ByteString.Lazy (ByteString)
+
+import Data.IORef (IORef, atomicModifyIORef', readIORef)
+
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as M
+
 import Data.Text (Text)
-import qualified Data.Text as T
 
 import Text.Blaze
 import Text.Blaze.Html5 as H
@@ -33,8 +44,6 @@ import Text.Blaze.Html5.Attributes as A
 import Servant
 import Servant.HTML.Blaze
 import Servant.Multipart
-import Servant.JS
-
 
 type Index = Get '[HTML] (HTMLTemplate IndexPage)
 
@@ -47,12 +56,12 @@ type ProjectUploadFile
   = "project" 
   :> Capture "projectName" ProjectName 
   :> MultipartForm Mem UploadedFile
-  :> Post '[JSON] Status
+  :> Post '[HTML] (HTMLTemplate ProjectPage)
 
 type ProjectAvenzamap
   = "project" 
   :> Capture "projectName" ProjectName 
-  :> "MapIndex.avenzamap"
+  :> "MapCollection.avenzamaps"
   :> Get '[JSON] AvenzaMap
 
 type MapFile
@@ -60,10 +69,10 @@ type MapFile
   :> Capture "projectName" ProjectName 
   :> "file"
   :> Capture "fileName" MapFileName
-  :> Get '[JSON] Text
+  :> Get '[OctetStream] ByteString
 
 newtype IndexPage = IndexPage [ProjectName]
-newtype ProjectName = ProjectName { unProject :: Text }
+newtype ProjectName = ProjectName { unProjectName :: Text }
   deriving stock (Show, Eq)
   deriving newtype (FromHttpApiData, ToHttpApiData)
 
@@ -71,17 +80,17 @@ data ProjectPage = ProjectPage ProjectName [MapFileName]
   deriving stock (Show, Eq)
 newtype MapFileName = MapFileName Text
   deriving stock (Show, Eq)
-  deriving newtype (FromHttpApiData, ToHttpApiData)
+  deriving newtype (Ord, FromHttpApiData, ToHttpApiData)
 
 newtype HTMLTemplate a = HTMLTemplate a
 
 data UploadedFile = UploadedFile (FileData Mem)
+  deriving stock (Eq, Show)
 
 instance FromMultipart Mem UploadedFile where
   fromMultipart multipartData =
     UploadedFile <$> lookupFile "file" multipartData
 
-type Status = Text
 type AvenzaMap = Text
 
 type WebAPI
@@ -100,13 +109,25 @@ api = Proxy
 webApi :: Proxy WebAPI
 webApi = Proxy
 
-avenzaAPIJS :: Text
-avenzaAPIJS = jsForAPI api jquery 
+newtype App a = App { _runApp :: ReaderT (IORef AppState) Handler a }
+  deriving newtype ( Functor, Applicative, Monad
+                   , MonadReader (IORef AppState)
+                   , MonadError ServerError
+                   , MonadIO)
 
+runApp :: IORef AppState -> App a -> Handler a
+runApp ref = flip runReaderT ref . _runApp
+
+data AppState = AppState
+  {_asProjectMap :: Map ProjectName (Map MapFileName UploadedFile)
+  } deriving stock (Show, Eq)
+
+emptyAppState :: AppState
+emptyAppState = AppState M.empty
 
 -- Handlers
 
-avenzaHandlers :: Server WebAPI
+avenzaHandlers :: ServerT WebAPI App
 avenzaHandlers =
   apiHandlers
   :<|> handleGetIndexPage
@@ -117,29 +138,46 @@ avenzaHandlers =
       :<|> handleGetProjectProjectAvenzamap
       :<|> handleGetMapFile
 
-handlePostProjectUploadFile :: ProjectName -> UploadedFile -> Handler Text
-handlePostProjectUploadFile (ProjectName project) (UploadedFile fileData) = do
-  let res = "handlePostProjectUploadFile: " <> project <> "\n" <> renderFile fileData
-  pure res
-  where 
-    renderFile :: FileData Mem -> Text
-    renderFile (FileData inputName fileName mimeType bs) =
-      fileName <> " (from input: " <> inputName <> ", mimeType: " <> mimeType <> ")\n"
-      <> T.pack (show bs)
+handlePostProjectUploadFile :: ProjectName -> UploadedFile -> App (HTMLTemplate ProjectPage)
+handlePostProjectUploadFile projectName uploadedFile@(UploadedFile fileData) = do
+  ref <- ask
+  projectFiles <- liftIO $ atomicModifyIORef' ref $ \(AppState projects) -> 
+    case M.lookup projectName projects of
+      Nothing ->
+        let newFiles = M.singleton (MapFileName $ fdFileName fileData) uploadedFile
+        in (AppState $ M.insert projectName newFiles projects, newFiles)
+      Just projectFiles -> 
+        let newFiles = M.insert (MapFileName $ fdFileName fileData) uploadedFile projectFiles
+        in (AppState $ M.insert projectName newFiles projects, newFiles)
+  liftIO $ print (projectName, projectFiles)
+  pure $ HTMLTemplate $ ProjectPage projectName $ M.keys projectFiles
 
-handleGetProjectProjectAvenzamap :: ProjectName -> Handler Text
+handleGetProjectProjectAvenzamap :: ProjectName -> App Text
 handleGetProjectProjectAvenzamap (ProjectName project) = pure $ "handleGetProjectProjectAvenzamap: " <> project
 
-handleGetIndexPage :: Handler (HTMLTemplate IndexPage)
-handleGetIndexPage = pure $ HTMLTemplate $ IndexPage [ProjectName "handleGetIndexPage", ProjectName "Another Project"]
+handleGetIndexPage :: App (HTMLTemplate IndexPage)
+handleGetIndexPage = do
+  ref <- ask
+  AppState projects <- liftIO $ readIORef ref
+  pure $ HTMLTemplate $ IndexPage $ M.keys projects
 
-handleGetProject :: ProjectName -> Handler (HTMLTemplate ProjectPage)
-handleGetProject project@(ProjectName projectName) = 
-  pure $ HTMLTemplate $ ProjectPage project [MapFileName $"handleGetProject: " <> projectName]
+handleGetProject :: ProjectName -> App (HTMLTemplate ProjectPage)
+handleGetProject projectName = do
+  ref <- ask
+  projectFiles <- liftIO $ atomicModifyIORef' ref $ \oldState@(AppState projects) -> 
+    case M.lookup projectName projects of
+      Nothing -> (AppState $ M.insert projectName M.empty projects, M.empty)
+      Just projectFiles -> (oldState, projectFiles)
+  liftIO $ print (projectName, projectFiles)
+  pure $ HTMLTemplate $ ProjectPage projectName $ M.keys projectFiles
 
-handleGetMapFile :: ProjectName -> MapFileName -> Handler Text
-handleGetMapFile (ProjectName project) (MapFileName mapFileName) =
-  pure $ "Project: " <> project <> "\nFileName: " <> mapFileName
+handleGetMapFile :: ProjectName -> MapFileName -> App ByteString
+handleGetMapFile projectName mapFile = do
+  ref <- ask
+  AppState projects <- liftIO $ readIORef ref
+  case M.lookup projectName projects >>= M.lookup mapFile of
+    Nothing -> throwError $ err404 {errReasonPhrase = "File Not Found"}
+    Just (UploadedFile fileData) -> pure $ fdPayload fileData
 
 instance ToMarkup IndexPage where
   toMarkup (IndexPage projects) = do
