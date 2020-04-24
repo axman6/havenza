@@ -48,9 +48,11 @@ library
   exposed-modules:     Havenza
   build-depends:        blaze-markup
                       , blaze-html
+                      , bytestring
+                      , containers
+                      , mtl
                       , servant
                       , servant-blaze
-                      , servant-js
                       , servant-multipart
                       , text
 
