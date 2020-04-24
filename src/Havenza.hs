@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
@@ -37,12 +38,15 @@ import Servant.JS
 
 type Index = Get '[HTML] (HTMLTemplate IndexPage)
 
-type Project = "project" :> Capture "projectName" ProjectName :> Get '[HTML] (HTMLTemplate ProjectPage)
+type Project 
+  = "project" 
+  :> Capture "projectName" ProjectName
+  :> Get '[HTML] (HTMLTemplate ProjectPage)
 
 type ProjectUploadFile
   = "project" 
   :> Capture "projectName" ProjectName 
-  :> MultipartForm Mem (MultipartData Mem)
+  :> MultipartForm Mem UploadedFile
   :> Post '[JSON] Status
 
 type ProjectAvenzamap
@@ -70,6 +74,12 @@ newtype MapFileName = MapFileName Text
   deriving newtype (FromHttpApiData, ToHttpApiData)
 
 newtype HTMLTemplate a = HTMLTemplate a
+
+data UploadedFile = UploadedFile (FileData Mem)
+
+instance FromMultipart Mem UploadedFile where
+  fromMultipart multipartData =
+    UploadedFile <$> lookupFile "file" multipartData
 
 type Status = Text
 type AvenzaMap = Text
@@ -107,19 +117,13 @@ avenzaHandlers =
       :<|> handleGetProjectProjectAvenzamap
       :<|> handleGetMapFile
 
-handlePostProjectUploadFile :: ProjectName -> MultipartData Mem -> Handler Text
-handlePostProjectUploadFile (ProjectName project) multipart = 
-  pure $ "handlePostProjectUploadFile: " <> project <> "\n" <> renderMultipart multipart
+handlePostProjectUploadFile :: ProjectName -> UploadedFile -> Handler Text
+handlePostProjectUploadFile (ProjectName project) (UploadedFile fileData) = do
+  let res = "handlePostProjectUploadFile: " <> project <> "\n" <> renderFile fileData
+  pure res
   where 
-    renderMultipart :: MultipartData Mem -> Text
-    renderMultipart (MultipartData is fs) =
-      T.unlines $ renderInputs is <> renderFiles fs
-   
-    renderInputs :: [Input] -> [Text]
-    renderInputs = fmap $ \(Input k v) -> k <> ": " <> v
-
-    renderFiles :: [FileData Mem] -> [Text]
-    renderFiles = fmap $ \(FileData inputName fileName mimeType bs) ->
+    renderFile :: FileData Mem -> Text
+    renderFile (FileData inputName fileName mimeType bs) =
       fileName <> " (from input: " <> inputName <> ", mimeType: " <> mimeType <> ")\n"
       <> T.pack (show bs)
 
@@ -152,6 +156,11 @@ instance ToMarkup ProjectPage where
   toMarkup (ProjectPage project fileNames) = do
     p "Files:"
     ul $ mapM_ linkFile fileNames
+    H.form ! action "#" ! method "post" ! enctype "multipart/form-data" $ do
+        p "Upload file:"
+        input ! type_ "file" ! name "file"
+        br
+        input ! type_ "submit" ! name "submit"
     where
       linkFile :: MapFileName -> Markup
       linkFile mapFile@(MapFileName mapFileText) =
