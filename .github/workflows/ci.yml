@@ -11,7 +11,7 @@ on:
 
 jobs:
   build:
-    name: ghc ${{ matrix.ghc }}
+    name: ghc ${{ matrix.ghc }} cabal ${{ matrix.cabal }}
     runs-on: ubuntu-16.04
     strategy:
       matrix:
@@ -37,7 +37,7 @@ jobs:
         name: Cache ~/.cabal/store
         with:
           path: ~/.cabal/store
-          key: ${{ runner.os }}-${{ matrix.ghc }}-cabal
+          key: ${{ runner.os }}-${{ matrix.ghc }}-${{ matrix.cabal }}-cabal
 
       - name: Build
         run: |
