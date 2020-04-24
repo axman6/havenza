@@ -84,7 +84,7 @@ newtype MapFileName = MapFileName Text
 
 newtype HTMLTemplate a = HTMLTemplate a
 
-data UploadedFile = UploadedFile (FileData Mem)
+newtype UploadedFile = UploadedFile (FileData Mem)
   deriving stock (Eq, Show)
 
 instance FromMultipart Mem UploadedFile where
