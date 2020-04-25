@@ -31,6 +31,7 @@ module Havenza
        , avenzaHandlers
        ) where
 
+import Control.Monad ((>=>))
 import Control.Monad.Except      (ExceptT(..))
 
 import Data.ByteString.Lazy (ByteString)
@@ -39,6 +40,8 @@ import Data.IORef (IORef, atomicModifyIORef', readIORef)
 
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
+
+import Data.Maybe (fromMaybe)
 
 import Data.Text (Text)
 
@@ -117,12 +120,6 @@ api = Proxy
 webApi :: Proxy WebAPI
 webApi = Proxy
 
--- newtype App a = App { _runApp :: ReaderT (IORef AppState) Handler a }
---   deriving newtype ( Functor, Applicative, Monad
---                    , MonadReader (IORef AppState)
---                    , MonadError ServerError
---                    , MonadIO)
-
 type App r = Sem (Project ': Error ServerError ': r)
 
 type Projects = Map ProjectName ProjectFiles
@@ -146,14 +143,13 @@ runApp ref = Handler . ExceptT . runM . runError . interpretProjectIORef ref
 
 interpretProjectIORef :: Member (Embed IO) r => IORef Projects -> Sem (Project ': r) a -> Sem r a
 interpretProjectIORef ref = interpret $ \case
-  GetProjects                               -> embed $ getProjects'
+  GetProjects                               -> embed $ readIORef ref
   GetProject projectName                    -> embed $ getProject' projectName
-  GetProjectFile projectName mapFileName    -> embed $ getProjectFile' projectName mapFileName
-  AddFileToProject projectName uploadedFile -> embed $ addFileToProject' projectName uploadedFile
+  GetProjectFile projectName mapFileName    ->
+     embed $ fmap (M.lookup projectName >=> M.lookup mapFileName) $ readIORef ref
+  AddFileToProject projectName uploadedFile ->
+     embed $ addFileToProject' projectName uploadedFile
   where
-    getProjects' :: IO Projects
-    getProjects' = readIORef ref
-
     getProject' :: ProjectName -> IO ProjectFiles
     getProject' projectName = do
       projectFiles <- atomicModifyIORef' ref $ \projects ->
@@ -163,21 +159,12 @@ interpretProjectIORef ref = interpret $ \case
       print (projectName, projectFiles)
       pure projectFiles
 
-    getProjectFile' :: ProjectName -> MapFileName -> IO (Maybe UploadedFile)
-    getProjectFile' projectName mapFileName = do
-      projects <- readIORef ref
-      pure $ M.lookup projectName projects >>= M.lookup mapFileName
-
     addFileToProject' :: ProjectName -> UploadedFile -> IO ProjectFiles
     addFileToProject' projectName uploadedFile@(UploadedFile FileData{..}) = do
       projectFiles <- atomicModifyIORef' ref $ \projects ->
-        case M.lookup projectName projects of
-          Nothing ->
-            let newFiles = M.singleton (MapFileName fdFileName) uploadedFile
-            in (M.insert projectName newFiles projects, newFiles)
-          Just projectFiles ->
-            let newFiles = M.insert (MapFileName fdFileName) uploadedFile projectFiles
-            in (M.insert projectName newFiles projects, newFiles)
+        let currentProject = fromMaybe M.empty $ M.lookup projectName projects
+            newFiles = M.insert (MapFileName fdFileName) uploadedFile currentProject
+        in (M.insert projectName newFiles projects, newFiles)
       print (projectName, projectFiles)
       pure projectFiles
 
