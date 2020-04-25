@@ -68,6 +68,9 @@ library
   import:              common-options
   hs-source-dirs:      src
   exposed-modules:     Havenza
+                      , Effects.Project
+                      , Model.Types
+                      , View.Page
   build-depends:        blaze-markup
                       , blaze-html
                       , bytestring
