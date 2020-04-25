@@ -2,9 +2,11 @@ module Model.Types
   ( module Model.Types
   ) where
 
+import Data.Aeson
+
 import Data.ByteString.Lazy (ByteString)
 
-import Data.Map.Strict (Map)
+import Data.Map.Strict (Map, keys)
 
 import Data.Text (Text)
 
@@ -13,8 +15,8 @@ import Servant.HTML.Blaze
 import Servant.Multipart
 
 import Text.Blaze
-import Text.Blaze.Html5            as H
-import Text.Blaze.Html5.Attributes as A
+import qualified Text.Blaze.Html5            as H
+import qualified Text.Blaze.Html5.Attributes as A
 
 import View.Page
 
@@ -89,7 +91,21 @@ instance FromMultipart Mem UploadedFile where
   fromMultipart multipartData =
     UploadedFile <$> lookupFile "file" multipartData
 
-type AvenzaMap = Text
+data AvenzaMap = AvenzaMap
+  { _amName :: ProjectName
+  , _amMaps :: ProjectFiles
+  }
+
+instance ToJSON AvenzaMap where
+  toJSON (AvenzaMap projectName projectFiles) = object
+    [ "Version" .= ("PDFMaps Maplist 1.1"::Text)
+    , "Name" .= unProjectName projectName
+    , "Collection" .= (getMapUrl <$> keys projectFiles )
+    ] where
+      getMapUrl :: MapFileName -> Value
+      getMapUrl mapFileName = 
+        let lnk = safeLink webApi (Proxy @MapFile) projectName mapFileName
+        in object [ "Map" .= object [ "URL" .= ("/" <> toUrlPiece lnk) ] ]
 
 type Projects = Map ProjectName ProjectFiles
 
@@ -97,42 +113,41 @@ type ProjectFiles = Map MapFileName UploadedFile
 
 instance Render IndexPage where
   render (IndexPage projects) = RenderedPage (Just "Project Index") $ do
-    p "Projects:"
-    ul $ mapM_ linkProject projects
+    H.p "Projects:"
+    H.ul $ mapM_ linkProject projects
     where
       linkProject :: ProjectName -> Markup
       linkProject project@(ProjectName projectText) =
         let lnk = safeLink webApi (Proxy @ProjectAPI) project
-        in li $
-            a ! href (toValue $ toUrlPiece lnk) $ toMarkup projectText
+        in H.li $ H.a ! A.href (toValue $ toUrlPiece lnk) $ toMarkup projectText
 
 
 instance Render ProjectPage where
   render (ProjectPage project fileNames) = 
     RenderedPage (Just $ "Project: " <> unProjectName project) $ 
-      H.div ! class_ "container" $
-        H.div ! class_ "row" $ do
-          H.div ! class_ "col-md-6 col-sm-12" $ do
-            h1 $ do
-              text (unProjectName project)
-              small $ linkForAvenzamap project
-            p "Files:"
-            ul $ mapM_ linkFile fileNames
-          H.div ! class_ "col-md-6 col-sm-12" $
-            H.div ! class_ "section" $
-              H.form ! action "#" ! method "post" ! enctype "multipart/form-data" $
-                fieldset $ do
-                  H.legend ! class_ "doc" $ "Upload file:"
-                  input ! type_ "file" ! name "file"
-                  br
-                  input ! class_ "button-primary tertiary small" ! type_ "submit" ! name "submit"
+      H.div ! A.class_ "container" $
+        H.div ! A.class_ "row" $ do
+          H.div ! A.class_ "col-md-6 col-sm-12" $ do
+            H.h1 $ do
+              H.text (unProjectName project)
+              H.small $ linkForAvenzamap project
+            H.p "Files:"
+            H.ul $ mapM_ linkFile fileNames
+          H.div ! A.class_ "col-md-6 col-sm-12" $
+            H.div ! A.class_ "section" $
+              H.form ! A.action "#" ! A.method "post" ! A.enctype "multipart/form-data" $
+                H.fieldset $ do
+                  H.legend ! A.class_ "doc" $ "Upload file:"
+                  H.input ! A.type_ "file" ! A.name "file"
+                  H.br
+                  H.input ! A.class_ "button-primary tertiary small" ! A.type_ "submit" ! A.name "submit"
     where
       linkFile :: MapFileName -> Markup
       linkFile mapFile@(MapFileName mapFileText) =
         let lnk = safeLink webApi (Proxy @MapFile) project mapFile
-        in li $ a ! href ("/" <> toValue (toUrlPiece lnk)) $ toMarkup mapFileText
+        in H.li $ H.a ! A.href ("/" <> toValue (toUrlPiece lnk)) $ toMarkup mapFileText
 
       linkForAvenzamap :: ProjectName -> Markup
       linkForAvenzamap projectName =
         let lnk = safeLink webApi (Proxy @ProjectAvenzamap) projectName
-        in a ! href ("/" <> toValue (toUrlPiece lnk)) $ "MapCollection.avenzamaps"
+        in H.a ! A.href ("/" <> toValue (toUrlPiece lnk)) $ "MapCollection.avenzamaps"

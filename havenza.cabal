@@ -71,7 +71,8 @@ library
                       , Effects.Project
                       , Model.Types
                       , View.Page
-  build-depends:        blaze-markup
+  build-depends:      aeson
+                      , blaze-markup
                       , blaze-html
                       , bytestring
                       , containers
