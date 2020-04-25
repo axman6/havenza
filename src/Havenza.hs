@@ -194,21 +194,20 @@ instance ToMarkup ProjectPage where
   toMarkup (ProjectPage project fileNames) =
     H.div ! class_ "container" $
       H.div ! class_ "row" $ do
-        H.div ! class_ "col-md-7 col-sm-12" $ do
+        H.div ! class_ "col-md-6 col-sm-12" $ do
           h1 $ do
             text (unProjectName project)
             small $ linkForAvenzamap project
           p "Files:"
           ul $ mapM_ linkFile fileNames
-        H.div ! class_ "col-md-5 col-sm-12" $
-          H.div ! class_ "card" $
-            H.div ! class_ "section" $
-              H.form ! action "#" ! method "post" ! enctype "multipart/form-data" $
-                fieldset $ do
-                  H.legend ! class_ "doc" $ "Upload file:"
-                  input ! type_ "file" ! name "file"
-                  br
-                  input ! class_ "button-primary tertiary small" ! type_ "submit" ! name "submit"
+        H.div ! class_ "col-md-6 col-sm-12" $
+          H.div ! class_ "section" $
+            H.form ! action "#" ! method "post" ! enctype "multipart/form-data" $
+              fieldset $ do
+                H.legend ! class_ "doc" $ "Upload file:"
+                input ! type_ "file" ! name "file"
+                br
+                input ! class_ "button-primary tertiary small" ! type_ "submit" ! name "submit"
     where
       linkFile :: MapFileName -> Markup
       linkFile mapFile@(MapFileName mapFileText) =
