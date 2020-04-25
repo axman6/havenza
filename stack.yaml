@@ -2,3 +2,6 @@ resolver: lts-15.5
 
 extra-deps:
   - servant-multipart-0.11.5@sha256:1633f715b5b53d648a1da69839bdc5046599f4f7244944d4bbf852dba38d8f4b,2319
+  - polysemy-plugin-0.2.5.0@sha256:67e30be568a141b852aace1a60e180cb5060fbb2835365a81a3ea779536d6d35,2952
+  - ghc-tcplugins-extra-0.3.2@sha256:1bbfd4449c3669a31618ea0ebc5d00d980a53988daad3b6218bab5c8cdff268d,1687
+  - polysemy-1.3.0.0@sha256:bf1d559c7e26e8a0ed31fc45d84635e329a4a31bfd39e713a39adf639bcbd309,6141
