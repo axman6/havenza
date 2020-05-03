@@ -20,8 +20,6 @@ import Data.ByteString.Lazy (ByteString)
 
 import qualified Data.Map.Strict as M
 
-import Data.Text (Text)
-
 import Polysemy.Error
 
 import Servant
@@ -52,8 +50,9 @@ handlePostProjectUploadFile projectName uploadedFile = do
   projectFiles <- addFileToProject projectName uploadedFile
   pure $ HTMLTemplate $ ProjectPage projectName $ M.keys projectFiles
 
-handleGetProjectProjectAvenzamap :: ProjectName -> App r Text
-handleGetProjectProjectAvenzamap (ProjectName project) = pure $ "handleGetProjectProjectAvenzamap: " <> project
+handleGetProjectProjectAvenzamap :: ProjectName -> App r AvenzaMap
+handleGetProjectProjectAvenzamap projectName =
+  AvenzaMap projectName <$> getProject projectName
 
 handleGetIndexPage :: App r (HTMLTemplate IndexPage)
 handleGetIndexPage = HTMLTemplate . IndexPage . M.keys <$> getProjects

@@ -51,19 +51,15 @@ interpretProjectIORef ref = interpret $ \case
      embed $ addFileToProject' projectName uploadedFile
   where
     getProject' :: ProjectName -> IO ProjectFiles
-    getProject' projectName = do
-      projectFiles <- atomicModifyIORef' ref $ \projects ->
+    getProject' projectName =
+      atomicModifyIORef' ref $ \projects ->
         case M.lookup projectName projects of
           Nothing -> (M.insert projectName M.empty projects, M.empty)
           Just projectFiles -> (projects, projectFiles)
-      print (projectName, projectFiles)
-      pure projectFiles
 
     addFileToProject' :: ProjectName -> UploadedFile -> IO ProjectFiles
-    addFileToProject' projectName uploadedFile@(UploadedFile FileData{..}) = do
-      projectFiles <- atomicModifyIORef' ref $ \projects ->
+    addFileToProject' projectName uploadedFile@(UploadedFile FileData{..}) =
+      atomicModifyIORef' ref $ \projects ->
         let currentProject = fromMaybe M.empty $ M.lookup projectName projects
             newFiles = M.insert (MapFileName fdFileName) uploadedFile currentProject
         in (M.insert projectName newFiles projects, newFiles)
-      print (projectName, projectFiles)
-      pure projectFiles
