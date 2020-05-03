@@ -38,6 +38,7 @@ avenzaHandlers :: ServerT WebAPI (App r)
 avenzaHandlers =
   apiHandlers
   :<|> handleGetIndexPage
+  :<|> handlePostCreateProject
   :<|> handleGetProject
   where
     apiHandlers =
@@ -56,6 +57,15 @@ handleGetProjectProjectAvenzamap projectName =
 
 handleGetIndexPage :: App r (HTMLTemplate IndexPage)
 handleGetIndexPage = HTMLTemplate . IndexPage . M.keys <$> getProjects
+
+handlePostCreateProject :: NewProject -> App r NoContent
+handlePostCreateProject (NewProject projectName files) = do
+  _ <- addFilesToProject projectName files
+  let projectPath = toHeader $ safeLink webApi (Proxy @ProjectAPI) projectName
+  throw $ err301 
+    { errHeaders = 
+      [("Location", "/" <> projectPath)] 
+    }
 
 handleGetProject :: ProjectName -> App r (HTMLTemplate ProjectPage)
 handleGetProject projectName =

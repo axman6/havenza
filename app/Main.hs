@@ -7,7 +7,6 @@ import Network.Wai.Handler.Warp (run)
 
 import Havenza
 
-
 main :: IO ()
 main = do
   ref <- newIORef emptyAppState

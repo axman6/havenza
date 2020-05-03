@@ -26,6 +26,10 @@ import View.Page
 
 type Index = Get '[HTML] (HTMLTemplate IndexPage)
 
+type CreateProject 
+  = MultipartForm Mem NewProject
+  :> Post '[HTML] NoContent
+
 type ProjectAPI
   = "project"
   :> Capture "projectName" ProjectName
@@ -53,6 +57,7 @@ type MapFile
 type WebAPI
   = API
   :<|> Index
+  :<|> CreateProject
   :<|> ProjectAPI
 
 type API
@@ -68,6 +73,8 @@ webApi = Proxy
 
 -- Pages
 
+data NewProject = NewProject ProjectName UploadedFiles
+  deriving stock (Show, Eq)
 
 newtype ProjectName = ProjectName { unProjectName :: Text }
   deriving stock (Show, Eq)
@@ -89,6 +96,12 @@ newtype UploadedFile = UploadedFile (FileData Mem)
 
 newtype UploadedFiles = UploadedFiles [FileData Mem]
   deriving stock (Eq, Show)
+
+instance FromMultipart Mem NewProject where
+  fromMultipart formData =
+    NewProject
+      <$> do ProjectName <$> lookupInput "projectName" formData
+      <*> fromMultipart formData
 
 instance FromMultipart Mem UploadedFiles where
   fromMultipart =
@@ -117,9 +130,25 @@ type Projects = Map ProjectName ProjectFiles
 type ProjectFiles = Map MapFileName UploadedFile
 
 instance Render IndexPage where
-  render (IndexPage projects) = RenderedPage (Just "Project Index") $ do
-    H.p "Projects:"
-    H.ul $ mapM_ linkProject projects
+  render (IndexPage projects) = RenderedPage (Just "Project Index") $
+    H.div ! A.class_ "container" $
+        H.div ! A.class_ "row" $ do
+          H.div ! A.class_ "col-md-6 col-sm-12" $ do
+            H.h1 $ H.text "Projects"
+              -- H.small $ linkForAvenzamap project
+            H.p "Projects:"
+            H.ul $ mapM_ linkProject projects
+          H.div ! A.class_ "col-md-6 col-sm-12" $
+            H.div ! A.class_ "section" $
+              H.form ! A.action "#" ! A.method "post" ! A.enctype "multipart/form-data" $
+                H.fieldset $ do
+                  H.legend ! A.class_ "doc" $ "New Collection:"
+                  H.label ! A.for "projectName" $ "Collection Name"
+                  H.input ! A.type_ "text" ! A.name "projectName"
+                  H.input ! A.type_ "file" ! A.name "files" ! A.multiple ""
+                  H.br
+                  H.input ! A.class_ "button-primary tertiary small" ! A.type_ "submit" ! A.name "submit"
+
     where
       linkProject :: ProjectName -> Markup
       linkProject project@(ProjectName projectText) =
