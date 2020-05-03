@@ -34,7 +34,7 @@ type ProjectAPI
 type ProjectUploadFile
   = "project"
   :> Capture "projectName" ProjectName
-  :> MultipartForm Mem UploadedFile
+  :> MultipartForm Mem UploadedFiles
   :> Post '[HTML] (HTMLTemplate ProjectPage)
 
 type ProjectAvenzamap
@@ -85,11 +85,15 @@ data ProjectPage = ProjectPage ProjectName [MapFileName]
     deriving stock (Show, Eq)
 
 newtype UploadedFile = UploadedFile (FileData Mem)
+  deriving stock (Show, Eq)
+
+newtype UploadedFiles = UploadedFiles [FileData Mem]
   deriving stock (Eq, Show)
 
-instance FromMultipart Mem UploadedFile where
-  fromMultipart multipartData =
-    UploadedFile <$> lookupFile "file" multipartData
+instance FromMultipart Mem UploadedFiles where
+  fromMultipart =
+    pure . UploadedFiles . filter (\f -> fdInputName f == "files") . files
+    -- UploadedFiles <$> lookupFile "file" multipartData
 
 data AvenzaMap = AvenzaMap
   { _amName :: ProjectName
@@ -139,7 +143,7 @@ instance Render ProjectPage where
               H.form ! A.action "#" ! A.method "post" ! A.enctype "multipart/form-data" $
                 H.fieldset $ do
                   H.legend ! A.class_ "doc" $ "Upload file:"
-                  H.input ! A.type_ "file" ! A.name "file" ! A.multiple ""
+                  H.input ! A.type_ "file" ! A.name "files" ! A.multiple ""
                   H.br
                   H.input ! A.class_ "button-primary tertiary small" ! A.type_ "submit" ! A.name "submit"
     where

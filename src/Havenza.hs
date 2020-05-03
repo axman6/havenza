@@ -45,9 +45,9 @@ avenzaHandlers =
       :<|> handleGetProjectProjectAvenzamap
       :<|> handleGetMapFile
 
-handlePostProjectUploadFile :: ProjectName -> UploadedFile -> App r (HTMLTemplate ProjectPage)
-handlePostProjectUploadFile projectName uploadedFile = do
-  projectFiles <- addFileToProject projectName uploadedFile
+handlePostProjectUploadFile :: ProjectName -> UploadedFiles -> App r (HTMLTemplate ProjectPage)
+handlePostProjectUploadFile projectName uploadedFiles = do
+  projectFiles <- addFilesToProject projectName uploadedFiles
   pure $ HTMLTemplate $ ProjectPage projectName $ M.keys projectFiles
 
 handleGetProjectProjectAvenzamap :: ProjectName -> App r AvenzaMap
