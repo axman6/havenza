@@ -5,7 +5,7 @@ module Effects.Project
   , getProjects
   , getProject
   , getProjectFile
-  , addFileToProject
+  , addFilesToProject
   , App
   , runApp
   ) where
@@ -30,10 +30,10 @@ import Model.Types
 type App r = Sem (Project ': Error ServerError ': r)
 
 data Project m a where
-  GetProjects      :: Project m Projects
-  GetProject       :: ProjectName -> Project m ProjectFiles
-  GetProjectFile   :: ProjectName -> MapFileName -> Project m (Maybe UploadedFile)
-  AddFileToProject :: ProjectName -> UploadedFile -> Project m ProjectFiles
+  GetProjects       :: Project m Projects
+  GetProject        :: ProjectName -> Project m ProjectFiles
+  GetProjectFile    :: ProjectName -> MapFileName -> Project m (Maybe UploadedFile)
+  AddFilesToProject :: ProjectName -> UploadedFiles -> Project m ProjectFiles
 
 makeSem ''Project
 
@@ -47,8 +47,8 @@ interpretProjectIORef ref = interpret $ \case
   GetProject projectName                    -> embed $ getProject' projectName
   GetProjectFile projectName mapFileName    ->
      embed $ fmap (M.lookup projectName >=> M.lookup mapFileName) $ readIORef ref
-  AddFileToProject projectName uploadedFile ->
-     embed $ addFileToProject' projectName uploadedFile
+  AddFilesToProject projectName uploadedFiles ->
+     embed $ addFilesToProject' projectName uploadedFiles
   where
     getProject' :: ProjectName -> IO ProjectFiles
     getProject' projectName =
@@ -57,9 +57,10 @@ interpretProjectIORef ref = interpret $ \case
           Nothing -> (M.insert projectName M.empty projects, M.empty)
           Just projectFiles -> (projects, projectFiles)
 
-    addFileToProject' :: ProjectName -> UploadedFile -> IO ProjectFiles
-    addFileToProject' projectName uploadedFile@(UploadedFile FileData{..}) =
+    addFilesToProject' :: ProjectName -> UploadedFiles -> IO ProjectFiles
+    addFilesToProject' projectName (UploadedFiles files) =
       atomicModifyIORef' ref $ \projects ->
         let currentProject = fromMaybe M.empty $ M.lookup projectName projects
-            newFiles = M.insert (MapFileName fdFileName) uploadedFile currentProject
+            newFiles = foldr (\file@FileData{..} -> M.insert (MapFileName fdFileName) (UploadedFile file))
+                             currentProject files
         in (M.insert projectName newFiles projects, newFiles)
