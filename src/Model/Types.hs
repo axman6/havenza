@@ -103,9 +103,10 @@ instance ToJSON AvenzaMap where
     , "Collection" .= (getMapUrl <$> keys projectFiles )
     ] where
       getMapUrl :: MapFileName -> Value
-      getMapUrl mapFileName = 
-        let lnk = safeLink webApi (Proxy @MapFile) projectName mapFileName
-        in object [ "Map" .= object [ "URL" .= ("/" <> toUrlPiece lnk) ] ]
+      getMapUrl (MapFileName name) = 
+        -- let lnk = safeLink webApi (Proxy @MapFile) projectName mapFileName
+        -- in 
+          object [ "Map" .= object [ "Path" .= ("file/" <> name) ] ]
 
 type Projects = Map ProjectName ProjectFiles
 
@@ -138,7 +139,7 @@ instance Render ProjectPage where
               H.form ! A.action "#" ! A.method "post" ! A.enctype "multipart/form-data" $
                 H.fieldset $ do
                   H.legend ! A.class_ "doc" $ "Upload file:"
-                  H.input ! A.type_ "file" ! A.name "file"
+                  H.input ! A.type_ "file" ! A.name "file" ! A.multiple ""
                   H.br
                   H.input ! A.class_ "button-primary tertiary small" ! A.type_ "submit" ! A.name "submit"
     where
